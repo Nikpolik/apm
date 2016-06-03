@@ -245,7 +245,6 @@ class Install extends Command
         callback("Unable to download #{packageUrl}: #{error.message}")
       readStream.on 'response', (response) =>
         if response.statusCode is 200
-          process.stdout.write("Object length is " + response.headers['content-length'])
           filePath = path.join(temp.mkdirSync(), 'package.tgz')
           writeStream = fs.createWriteStream(filePath)
           readStream.pipe(writeStream)
