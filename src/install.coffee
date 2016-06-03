@@ -9,7 +9,7 @@ Git = require 'git-utils'
 semver = require 'npm/node_modules/semver'
 temp = require 'temp'
 hostedGitInfo = require 'hosted-git-info'
-
+progress = require 'progress-stream'
 config = require './apm'
 Command = require './command'
 fs = require './fs'
@@ -245,9 +245,22 @@ class Install extends Command
         callback("Unable to download #{packageUrl}: #{error.message}")
       readStream.on 'response', (response) =>
         if response.statusCode is 200
+          size = response.headers['content-length']
+          str = progress(
+            length: size
+            time: 0.25
+          )
+          process.stdout.write('\n')
+          str.on 'progress', (progress) ->
+            percentage = Math.round progress['percentage']
+            byteToKbS = 125
+            speed = progress['speed'] / byteToMB
+            eta = progress['eta']
+            output = "\rDownloading: #{percentage} Speed: #{speed} kb/s Eta: #{eta}s"
+            process.stdout.write(output)
           filePath = path.join(temp.mkdirSync(), 'package.tgz')
           writeStream = fs.createWriteStream(filePath)
-          readStream.pipe(writeStream)
+          readStream.pipe(str).pipe(writeStream)
           writeStream.on 'error', (error) ->
             callback("Unable to download #{packageUrl}: #{error.message}")
           writeStream.on 'close', -> callback(null, filePath)
@@ -329,19 +342,20 @@ class Install extends Command
         packageVersion ?= @getLatestCompatibleVersion(pack)
         unless packageVersion
           @logFailure()
-          callback("No available version compatible with the installed Atom version: #{@installedAtomVersion}")
+          callback("Test No available version compatible with the installed Atom version: #{@installedAtomVersion}")
           return
 
         {tarball} = pack.versions[packageVersion]?.dist ? {}
         unless tarball
           @logFailure()
-          callback("Package version: #{packageVersion} not found")
+          callback(" Test Package version: #{packageVersion} not found")
           return
 
         commands = []
         commands.push (next) =>
           @getPackageCachePath packageName, packageVersion, (error, packagePath) =>
             if packagePath
+              process.stdout.write('\nWas found in chache not downloading')
               next(null, packagePath)
             else
               @downloadPackage(tarball, installGlobally, next)
